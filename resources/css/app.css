@@ -1,0 +1,8 @@
+@import "https://use.typekit.net/nue1czj.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face { font-family: WinXp; src: url('windows-xp-tahoma.otf'); }
+@font-face { font-family: WinXp; font-weight: bold; src: url('windows-xp-tahoma.otf');}
