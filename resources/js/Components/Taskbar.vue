@@ -1,24 +1,22 @@
 <script>
 export default {
     name: "Taskbar",
+    props: {
+        activeTasks: {
+            type: Array,
+            required: true,
+            default: () => []
+        }
+    },
     data() {
         return {
             menuActive: false,
-            tasks: [
-                {
-                    id: 1,
-                    name: "Mój komputer",
-                    icon: "netid.dll_14_101-9.png",
-                    active: false,
-                },
-                {
-                    id: 2,
-                    name: "Internet Explorer",
-                    icon: "mshtml.dll_14_2660-1.png",
-                    active: false,
-                }
-            ],
-            date: new Date()
+            tasks: [],
+            date: new Date(),
+            grabbedTask: null,
+            taskElements: {},
+            movedMouse: false,
+            blockNextClick: false,
         }
     },
     methods: {
@@ -30,6 +28,35 @@ export default {
                     task.active = false
                 }
             })
+        },
+        grabTask(e, task) {
+            this.grabbedTask = {
+                element: this.taskElements[task.id],
+                task: task,
+                initialX: e.clientX,
+            }
+        },
+    },
+    emits: [
+        "selectWindow",
+    ],
+    watch: {
+        activeTasks: {
+            handler(newTasks, oldTasks) {
+                newTasks.forEach((task) => {
+                    if (this.tasks.find(localTask => localTask.id === task.id)) {
+                        const taskIndex = this.tasks.indexOf(this.tasks.find(localTask => localTask.id === task.id))
+                        this.tasks[taskIndex] = {...this.tasks[taskIndex], ...task}
+                    } else {
+                        const maxOrder = Math.max(...this.tasks.map(o => o.order))
+                        this.tasks = [...this.tasks, {...task, order: [...this.tasks.map(o => o.order)].length > 0 ? Math.max(...this.tasks.map(o => o.order)) + 1 : 0}]
+                    }
+                })
+
+                this.tasks = this.tasks.filter(task => newTasks.find(newTask => newTask.id === task.id)).sort((a, b) => a.order - b.order)
+            },
+            deep: true,
+            immediate: true
         }
     },
     mounted() {
@@ -37,6 +64,57 @@ export default {
         setInterval(() => {
             this.date = new Date()
         }, 1000)
+
+        document.addEventListener('mousemove', (e) => {
+            if (this.grabbedTask) {
+
+
+                const taskIndex = this.tasks.findIndex(task => task.id === this.grabbedTask.task.id)
+
+                const xDiff = e.clientX - this.grabbedTask.initialX
+                if (Math.abs(xDiff) > 10) {
+                    this.movedMouse = true;
+                }
+                this.grabbedTask.element.style.left = `${xDiff}px`
+                this.grabbedTask.element.style.zIndex = '99999';
+                this.grabbedTask.element.style.transiton = 'none';
+
+                const taskMetrics = this.grabbedTask.element.getBoundingClientRect()
+
+                if (xDiff > (taskMetrics.width / 2) + 16 && taskIndex !== this.tasks.length - 1) {
+                    this.grabbedTask.initialX += taskMetrics.width + 16;
+
+                    [this.tasks[taskIndex].order, this.tasks[taskIndex + 1].order] = [this.tasks[taskIndex + 1].order, this.tasks[taskIndex].order]
+
+                    this.tasks = this.tasks.sort((a, b) => a.order - b.order)
+
+                } else if (xDiff < -(taskMetrics.width / 2) - 16 && taskIndex!== 0) {
+                    this.grabbedTask.initialX -= taskMetrics.width + 16;
+
+                    [this.tasks[taskIndex].order, this.tasks[taskIndex - 1].order] = [this.tasks[taskIndex - 1].order, this.tasks[taskIndex].order]
+
+                    this.tasks = this.tasks.sort((a, b) => a.order - b.order)
+                }
+            }
+        })
+
+        document.addEventListener('mouseup', (e) => {
+            this.grabbedTask.element.querySelectorAll("*").forEach(el => {
+                if ((el === e.target || this.grabbedTask.element === e.target) && this.movedMouse) { this.blockNextClick = true; }
+            })
+            this.movedMouse = false;
+            this.grabbedTask.element.style.left = '0';
+            this.grabbedTask.element.style.zIndex = 'auto';
+            if (this.grabbedTask) {
+                this.grabbedTask = null
+            }
+        })
+
+        document.querySelectorAll('.task img').forEach(img => {
+            img.ondragstart = (e) => {
+                return false;
+            }
+        })
     }
 }
 </script>
@@ -156,14 +234,32 @@ export default {
         <img src="win-logo.png" alt=""> start
     </button>
 
-    <div class="tasks">
-        <button class="task" v-for="task in tasks" :key="task.id" @click="switchTask(task)" :class="{
-            active: task.active
-        }">
-            <img :src="task.icon" :alt="task.name" />
-            <p>{{ task.name }}</p>
-        </button>
-    </div>
+    <TransitionGroup name="list" tag="div" class="tasks">
+        <div class="task_container"
+            v-for="task in tasks.sort((a, b) => a.order - b.order)"
+            :key="task.id"
+            @mousedown="grabTask($event, task)"
+             :ref="(el) => {
+                 taskElements[task.id] = el
+             }"
+        >
+            <button
+                class="task"
+                @click="() => {
+                    console.log(this.blockNextClick)
+                    if (this.blockNextClick) {
+                        this.blockNextClick = false;
+                    } else {
+                        $emit('selectWindow', task.id)
+                    }
+                }"
+                :class="{ active: task.selected }"
+            >
+                <img :src="task.icon" :alt="task.name" />
+                <p>{{ task.title }}</p>
+            </button>
+        </div>
+    </TransitionGroup>
 
     <div class="clock">
         {{ date.getHours() }}:{{ date.getMinutes() < 10 ? "0" + date.getMinutes() : date.getMinutes() }}
@@ -217,23 +313,34 @@ export default {
     display: flex;
     gap: 0.5rem;
     width: 100%;
+    user-select: none;
 }
 .task {
     background: #3980f4;
     display: flex;
     color: white;
     font-size: 24px;
-    width: 20%;
     gap: 1rem;
     min-width: 48px;
+    width: 100%;
+    height: 100%;
     padding-inline: 1rem;
-    height: 42px;
     align-items: center;
     border-radius: 0.2rem;
     box-shadow: 3px 2px 4px 0 #70a5f6 inset, -3px -2px 4px 0 #2652b0 inset;
     overflow: hidden;
     container-name: task;
     container-type: inline-size;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.task_container {
+    width: 100%;
+    height: 42px;
+    max-width: 300px;
+    position: relative;
 }
 
 p {
@@ -430,5 +537,22 @@ p {
     width: 32px;
     height: 32px;
     object-fit: contain;
+}
+
+.list-move, /* apply transition to moving elements */
+.list-enter-active,
+.list-leave-active {
+    transition: all 0.5s ease;
+}
+
+.list-enter-from,
+.list-leave-to {
+    opacity: 0;
+}
+
+/* ensure leaving items are taken out of layout flow so that moving
+   animations can be calculated correctly. */
+.list-leave-active {
+    position: absolute;
 }
 </style>
