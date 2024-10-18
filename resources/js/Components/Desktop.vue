@@ -45,10 +45,10 @@ export default {
             mouseSelectApps: null,
             grabActive: null,
             selectActive: false,
-            newAppIndexes: {
-                row: 0,
-                col: 0
-            },
+            // newAppIndexes: {
+            //     row: 0,
+            //     col: 0
+            // },
             lastSelectedAppId: null,
             blockNextClick: false,
             selectSize: {
@@ -254,7 +254,6 @@ export default {
             })
 
             this.updateGrid()
-            console.log(this.blockNextClick)
         },
         handleGrab(mouseX, mouseY) {
             const app = this.apps.filter(app => app.id === this.grabActive)[0]
@@ -308,20 +307,12 @@ export default {
                         let nextSelectedRowIndex = nextRowIndex - app.row
                         let nextSelectedColIndex = nextColIndex - app.col
 
-                        console.log(selectedApp.row + nextSelectedRowIndex, selectedApp.col + nextSelectedColIndex)
-
                         return {
                             ...selectedApp,
                             row: selectedApp.selected || selectedApp.id === app.id ? selectedApp.row + nextSelectedRowIndex : selectedApp.row,
                             col: selectedApp.selected || selectedApp.id === app.id ? selectedApp.col + nextSelectedColIndex : selectedApp.col
                         }
                     })
-                    //
-                    // this.apps[this.apps.indexOf(app)] = {
-                    //     ...app,
-                    //     row: nextRowIndex,
-                    //     col: nextColIndex
-                    // }
                 }
             }
         },
@@ -381,7 +372,6 @@ export default {
                 if (newGrid[row][col] !== null) {
                     this.moveAppDown(row, col, newGrid)
                 }
-                console.log(app.title, app.row, app.col, row, col)
 
                 newGrid[row][col] = {
                     title: app.title,
@@ -689,13 +679,17 @@ export default {
                 row: row,
                 col: col
             }
+        },
+        showPopup(event) {
+            event.default()
+            console.log(event)
         }
     }
 }
 </script>
 
 <template>
-<main class="desktop-wrapper" @mouseup="cancelSelect" @mousedown="registerMouseSelect">
+<main class="desktop-wrapper" @mouseup="cancelSelect" @mousedown="registerMouseSelect" @contextmenu.prevent="showPopup">
     <div class="desktop-row" v-for="(row, rowIndex) in desktopGridLayout" :key="rowIndex">
         <div class="desktop-slot" v-for="(slot, slotIndex) in row" :key="slotIndex" ref="appSlots">
             <div class="app-wrapper"  v-if="slot" @mousedown="registerGrab($event, slot)" @touchstart="registerGrab($event, slot)" @click="selectApp($event, slot)" :class="{
