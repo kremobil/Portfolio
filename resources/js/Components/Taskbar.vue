@@ -99,13 +99,14 @@ export default {
         })
 
         document.addEventListener('mouseup', (e) => {
-            this.grabbedTask.element.querySelectorAll("*").forEach(el => {
-                if ((el === e.target || this.grabbedTask.element === e.target) && this.movedMouse) { this.blockNextClick = true; }
-            })
-            this.movedMouse = false;
-            this.grabbedTask.element.style.left = '0';
-            this.grabbedTask.element.style.zIndex = 'auto';
             if (this.grabbedTask) {
+                this.grabbedTask.element.querySelectorAll("*").forEach(el => {
+                    if ((el === e.target || this.grabbedTask.element === e.target) && this.movedMouse) { this.blockNextClick = true; }
+                })
+                this.movedMouse = false;
+                this.grabbedTask.element.style.left = '0';
+                this.grabbedTask.element.style.zIndex = 'auto';
+
                 this.grabbedTask = null
             }
         })

@@ -14,15 +14,15 @@ export default {
                     title: "Notatnik",
                     icon: "NOTEPAD.EXE_14_2-4.png",
                     maximized: false,
-                    minimized: false,
-                    selected: true
+                    minimized: true,
+                    selected: false
                 },
                 {
                     id: 2,
                     title: "Kalkulator",
                     icon: "/icons/Calculator.png",
                     maximized: false,
-                    minimized: false,
+                    minimized: true,
                     selected: false
                 },
                 {
@@ -30,7 +30,7 @@ export default {
                     title: "Paint",
                     icon: "/icons/Paint.png",
                     maximized: false,
-                    minimized: false,
+                    minimized: true,
                     selected: false
                 },
             ]
@@ -47,14 +47,14 @@ export default {
         closeWindow(windowId) {
             this.activeWindows = [...this.activeWindows.filter(window => window.id!== windowId)];
             const notMinimizedWindows = this.activeWindows.filter(window => !window.minimized);
-            if (notMinimizedWindows) {
+            if (notMinimizedWindows.length > 0) {
                 this.changeSelectedWindow(notMinimizedWindows.at(-1).id)
             }
         },
         minimizeWindow(windowId) {
             this.activeWindows.find(window => window.id === windowId).minimized = true;
             const notMinimizedWindows = this.activeWindows.filter(window => !window.minimized);
-            if (notMinimizedWindows) {
+            if (notMinimizedWindows.length > 0) {
                 this.changeSelectedWindow(notMinimizedWindows.at(-1).id)
             }
         },
@@ -77,7 +77,11 @@ export default {
     <Head title="Portfolio - Pulpit" />
 
     <section class="system-wrapper" ref="system">
-        <Desktop />
+        <Desktop :default-apps="this.activeWindows.map((window) => ({
+            id: window.id,
+            title: window.title,
+            icon: window.icon
+        }))"/>
         <Taskbar :active-tasks="activeWindows" @select-window="selectTaskWindow"/>
         <AppWindow
             v-for="window in activeWindows"
