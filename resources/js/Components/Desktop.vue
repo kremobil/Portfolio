@@ -240,6 +240,8 @@ export default {
             this.grabActive = slot.id
         },
         endGrab() {
+            const selectedApps = this.apps.filter(app => app.selected)
+
             const app = this.apps.filter(app => app.id === this.grabActive)[0]
 
             const appRow = this.desktopGridLayout.filter(row =>
@@ -257,6 +259,7 @@ export default {
                 this.moveAppDown(app.row, app.col);
             }
 
+            console.log(`Main app finished on (${app.row}, ${app.col}) ${this.desktopGridLayout[app.row][app.col]}`)
             this.desktopGridLayout[app.row][app.col] = appCol
 
             const appWrapper = app.element.querySelector(".app-wrapper")
@@ -356,12 +359,15 @@ export default {
                 }
             }
 
-            console.log("Moving", grid[rowIndex][colIndex].title, "from", rowIndex, colIndex, "occupied slot to", newRowIndex, newColIndex)
+            // console.log("Moving", grid[rowIndex][colIndex].title, "from", rowIndex, colIndex, "occupied slot to", newRowIndex, newColIndex)
             if (grid[newRowIndex][newColIndex] !== null) {
+                console.log("entering reccurention")
                 this.moveAppDown(newRowIndex, newColIndex)
             }
 
             const app = this.apps.filter(app => app ? app.id === grid[rowIndex][colIndex].id : false)[0]
+
+            console.log(`Moved app finished on (${newRowIndex}, ${newColIndex})`, grid[newRowIndex][newColIndex], grid[newRowIndex][newColIndex] !== null)
 
             grid[newRowIndex][newColIndex] = grid[rowIndex][colIndex]
             grid[rowIndex][colIndex] = null
@@ -373,7 +379,7 @@ export default {
             }
         },
         updateGrid(numOfRows = this.desktopGridLayout.length, numOfCols = this.desktopGridLayout[0].length) {
-            console.error("new grid update");
+            // console.error("new grid update");
             const newGrid = []
             for (let i = 0; i < numOfRows; i++) {
                 newGrid.push([])
@@ -405,11 +411,14 @@ export default {
                     col = 0
                 }
 
-                console.log("Moving app: ", app.title, " from: ", app.row, app.col, " to: ", row, col)
+                // console.log("Moving app: ", app.title, " from: ", app.row, app.col, " to: ", row, col)
                 if (newGrid[row][col] !== null) {
-                    console.log("Slot is occupied moving occupied app down")
+                    // console.log("Slot is occupied moving occupied app down")
                     this.moveAppDown(row, col, newGrid)
                 }
+
+                console.log(`Selected app finished on (${row}, ${col}) ${newGrid[row][col]}`)
+
 
                 newGrid[row][col] = {
                     title: app.title,
