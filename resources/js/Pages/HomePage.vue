@@ -3,9 +3,10 @@ import {Head} from "@inertiajs/vue3";
 import Taskbar from "@/Components/Taskbar.vue"
 import Desktop from "@/Components/Desktop.vue";
 import AppWindow from "@/Layouts/AppWindow.vue";
+import Notepad from "@/Apps/NotePad.vue";
 
 export default {
-    components: {AppWindow, Desktop, Head, Taskbar},
+    components: {Notepad, AppWindow, Desktop, Head, Taskbar},
     data() {
         return  {
             activeWindows: [
@@ -14,7 +15,7 @@ export default {
                     title: "Notatnik",
                     icon: "NOTEPAD.EXE_14_2-4.png",
                     maximized: false,
-                    minimized: true,
+                    minimized: false,
                     selected: false
                 },
                 {
@@ -96,7 +97,7 @@ export default {
             @selected-window="changeSelectedWindow(window.id)"
             @minimize-window="minimizeWindow(window.id)"
         >
-            <h1>Hello world</h1>
+            <Notepad></Notepad>
         </AppWindow>
     </section>
 </template>

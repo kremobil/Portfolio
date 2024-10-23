@@ -1,4 +1,6 @@
 <script>
+import edit from "@/Pages/Posts/Edit.vue";
+
 export default {
     name: "Desktop",
     props: {
@@ -24,6 +26,7 @@ export default {
                     row: 0,
                     col: 0,
                     selected: false,
+                    edit: false,
                 },
                 {
                     id: 1,
@@ -32,6 +35,7 @@ export default {
                     row: 1,
                     col: 0,
                     selected: false,
+                    edit: false,
                 }
             ],
             grabOffset: {
@@ -45,10 +49,10 @@ export default {
             mouseSelectApps: null,
             grabActive: null,
             selectActive: false,
-            // newAppIndexes: {
-            //     row: 0,
-            //     col: 0
-            // },
+            contextMenuPosition: {
+                top: 0,
+                left: 0
+            },
             lastSelectedAppId: null,
             blockNextClick: false,
             selectSize: {
@@ -60,11 +64,12 @@ export default {
                     x: 0,
                     y: 0
                 },
-            }
+            },
+            contextMenuActive: false,
         }
     },
     watch: {
-      viewportSize: {
+        viewportSize: {
           handler(viewport) {
               const numOfRows = Math.floor((viewport.height-60 + this.iconSize.gap)/(this.iconSize.height + this.iconSize.gap));
               const numOfCols = Math.floor(viewport.width/(this.iconSize.width + this.iconSize.gap));
@@ -81,6 +86,7 @@ export default {
                 row: app.id - 1,
                 col: 0,
                 selected: false,
+                edit: false,
             }))
 
               this.updateGrid()
@@ -104,6 +110,12 @@ export default {
             }
             if (this.selectActive) {
                 this.endMouseSelect()
+            }
+        })
+
+        document.addEventListener("click", (e) => {
+            if (this.contextMenuActive) {
+                this.contextMenuActive = false
             }
         })
 
@@ -154,6 +166,9 @@ export default {
         })
     },
     computed: {
+        edit() {
+            return edit
+        },
       selectComputedStyle() {
               return this.selectActive ? {
                   top: `${this.selectSize.top}px`,
@@ -169,6 +184,15 @@ export default {
                   transform: "none"
               }
 
+      },
+      contextMenuComputedStyle() {
+          return this.contextMenuActive ? {
+                  top: `${this.contextMenuPosition.top}px`,
+                  left: `${this.contextMenuPosition.left}px`,
+              } : {
+                  top: 0,
+                  left: 0,
+              }
       }
     },
     methods: {
@@ -332,6 +356,7 @@ export default {
                 }
             }
 
+            console.log("Moving", grid[rowIndex][colIndex].title, "from", rowIndex, colIndex, "occupied slot to", newRowIndex, newColIndex)
             if (grid[newRowIndex][newColIndex] !== null) {
                 this.moveAppDown(newRowIndex, newColIndex)
             }
@@ -348,6 +373,7 @@ export default {
             }
         },
         updateGrid(numOfRows = this.desktopGridLayout.length, numOfCols = this.desktopGridLayout[0].length) {
+            console.error("new grid update");
             const newGrid = []
             for (let i = 0; i < numOfRows; i++) {
                 newGrid.push([])
@@ -355,7 +381,16 @@ export default {
                     newGrid[i].push(null)
                 }
             }
-            this.apps.forEach(app => {
+            this.apps.sort((a,b) => {
+                let rowDiff = a.row - b.row
+                let colDiff = a.col - b.col
+                if (colDiff === 0) {
+                    return rowDiff
+                }
+                return colDiff
+            }).sort(function (x, y) {
+                return (x === y) ? 0 : x ? 1 : -1;
+            }).forEach(app => {
                 let row = app.row
                 let col = app.col
                 if (row >= newGrid.length ) {
@@ -369,7 +404,10 @@ export default {
                 } else if (col < 0) {
                     col = 0
                 }
+
+                console.log("Moving app: ", app.title, " from: ", app.row, app.col, " to: ", row, col)
                 if (newGrid[row][col] !== null) {
+                    console.log("Slot is occupied moving occupied app down")
                     this.moveAppDown(row, col, newGrid)
                 }
 
@@ -681,8 +719,39 @@ export default {
             }
         },
         showPopup(event) {
-            event.default()
-            console.log(event)
+            this.contextMenuActive = true
+            this.mouseStartingPosition = {
+                x: event.clientX,
+                y: event.clientY
+            }
+            this.contextMenuPosition.left = event.clientX
+            this.contextMenuPosition.top = event.clientY
+        },
+        addApp(title, icon) {
+            let row, col;
+            for (let i = 0; i < this.desktopGridLayout[0].length; i++) {
+                for(let j = 0; j < this.desktopGridLayout.length; j++) {
+                    if (this.desktopGridLayout[j][i] === null) {
+                        row = j;
+                        col = i;
+                        break;
+                    }
+                }
+                if (row!== undefined && col!== undefined) {
+                    break;
+                }
+            }
+            const appData = {
+                id: Math.max(...this.apps.map(app => app.id))+1,
+                title: title,
+                icon: icon,
+                selected: false,
+                row: row,
+                col: col,
+                edit: false,
+            }
+            this.apps.push(appData)
+            this.updateGrid()
         }
     }
 }
@@ -694,7 +763,7 @@ export default {
         <div class="desktop-slot" v-for="(slot, slotIndex) in row" :key="slotIndex" ref="appSlots">
             <div class="app-wrapper"  v-if="slot" @mousedown="registerGrab($event, slot)" @touchstart="registerGrab($event, slot)" @click="selectApp($event, slot)" :class="{
                 selected: slot.selected
-            }" :id="`slot${slot.id}`">
+            }" :id="`slot${slot.id}`" @dblclick="slot.edit = true">
                 <div class="image-container">
                     <img :src="slot.icon" :alt="slot.title">
                     <div class="select-overlay" :style="{
@@ -703,11 +772,56 @@ export default {
 
                     </div>
                 </div>
-                <h3>{{slot.title}}</h3>
+                <input type="text" v-if="slot.edit" v-model="slot.title">
+                <h3 v-else>{{slot.title}}</h3>
             </div>
         </div>
     </div>
     <div class="select_block" v-if="selectActive" :style="selectComputedStyle"></div>
+    <ul class="context-menu" v-if="contextMenuActive" :style="contextMenuComputedStyle">
+        <li>
+            <p>Ułóż ikony wedłóg</p>  <span class="arrow_icon">▶</span>
+            <ul class="dropdown">
+                <li>
+                    <p>po Nazwie</p>
+                </li>
+                <li>
+                    <p>po Typie</p>
+                </li>
+                <li>
+                    <p>po Rozmiarze</p>
+                </li>
+                <li>
+                    <p>po Dacie</p>
+                </li>
+                <li class="separator"></li>
+                <li>
+                    <p>Automatycznie ułóż</p>
+                </li>
+            </ul>
+        </li>
+        <li><p @click="$forceUpdate()">Odśwież</p></li>
+        <li class="separator"></li>
+        <li><p>Wklej</p></li>
+        <li><p>Wklej skrót</p></li>
+        <li class="separator"></li>
+        <li>
+            <p>Nowy</p> <span class="arrow_icon">▶</span>
+            <ul class="dropdown">
+                <li @click="addApp('folder', 'icons/Folder Closed.png')">
+                    <p>Nowy Folder</p>
+                </li>
+                <li @click="addApp('skrót', 'icons/Shortcut overlay.png')">
+                    <p>Nowy Skrót</p>
+                </li>
+                <li @click="addApp('nazwa.txt', 'icons/Notepad.png')">
+                    <p>Nowy Plik tekstowy</p>
+                </li>
+            </ul>
+        </li>
+        <li class="separator"></li>
+        <li><p>Właściwości</p></li>
+    </ul>
 </main>
 </template>
 
@@ -759,7 +873,7 @@ export default {
     height: 3rem;
     display: block;
 }
-.app-wrapper h3 {
+.app-wrapper h3, .app-wrapper input {
     font-size: 0.8rem;
     color: white;
     overflow: hidden;
@@ -768,6 +882,10 @@ export default {
     max-width: 100%;
     text-shadow: 1px 1px 3px black, 1px 1px 3px black;
     position: relative;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    margin: 0;
 }
 .app-wrapper.selected h3 {
     background-color: #1669BD;
@@ -795,5 +913,72 @@ export default {
     background-color:  rgba(22, 105, 189, 0.3);
     border: 1px solid rgba(22, 105, 189, 0.6);
     box-sizing: border-box;
+}
+
+.context-menu {
+    position: absolute;
+    top: 300px;
+    left: 500px;
+    background-color: #d4d0c8;
+    box-shadow: inset 2px 2px 2px #faf9f8, inset -2px -2px 2px #3f4a55;
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    font-family: 'WinXp';
+    font-size: 1.2rem;
+    padding: 0.2rem;
+}
+.context-menu .separator {
+    display: block;
+    width: 100%;
+    height: 1px;
+    background-color: #9b9a97;
+    box-shadow: 0 1px 1px #f8f8f8;
+}
+.context-menu p {
+    padding: 0;
+}
+.arrow_icon {
+    font-size: 0.8rem;
+}
+.context-menu li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0 1rem;
+    margin: 1px;
+    position: relative;
+}
+
+li:hover {
+    background-color: #09246a;
+    border: 1px solid #000260;
+    margin: 0;
+    cursor: pointer;
+}
+.separator:hover {
+    background-color: #9b9a97;
+    box-shadow: 0 1px 1px #f8f8f8;
+    border: none;
+    margin: 0;
+    cursor: none;
+}
+li:hover>p, li:hover>span {
+    color: white;
+}
+.dropdown{
+    position: absolute;
+    top: 0;
+    left: 100%;
+    background-color: #d4d0c8;
+    box-shadow: inset 2px 2px 2px #faf9f8, inset -2px -2px 2px #3f4a55;
+    display: none;
+    flex-direction: column;
+    text-wrap: nowrap;
+    padding: 0.2rem;
+}
+li:hover>.dropdown {
+    display: flex;
 }
 </style>
