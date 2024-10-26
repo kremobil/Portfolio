@@ -49,9 +49,12 @@ export default {
             mouseSelectApps: null,
             grabActive: null,
             selectActive: false,
-            contextMenuPosition: {
+            contextMenuSize: {
                 top: 0,
-                left: 0
+                left: 0,
+                x: 0,
+                y: 0,
+                opacity: 0,
             },
             lastSelectedAppId: null,
             blockNextClick: false,
@@ -65,6 +68,8 @@ export default {
                     y: 0
                 },
             },
+            contextMenuOverflowX: false,
+            contextMenuOverflowY: false,
             contextMenuActive: false,
         }
     },
@@ -187,8 +192,10 @@ export default {
       },
       contextMenuComputedStyle() {
           return this.contextMenuActive ? {
-                  top: `${this.contextMenuPosition.top}px`,
-                  left: `${this.contextMenuPosition.left}px`,
+                  top: `${this.contextMenuSize.top}px`,
+                  left: `${this.contextMenuSize.left}px`,
+                  transform: `translateX(${this.contextMenuSize.x}px) translateY(${this.contextMenuSize.y}px)`,
+                  opacity: this.contextMenuSize.opacity
               } : {
                   top: 0,
                   left: 0,
@@ -240,47 +247,106 @@ export default {
             this.grabActive = slot.id
         },
         endGrab() {
-            const selectedApps = this.apps.filter(app => app.selected)
+            let selectedApps = this.apps.filter(app => app.selected)
+            let grabbedApp = this.apps.filter(app => app.id === this.grabActive)[0]
 
-            const app = this.apps.filter(app => app.id === this.grabActive)[0]
+            // if (!(selectedApps.includes(grabbedApp) || selectedApps.length === 0)) {
+            //     this.apps = this.apps.map(app => ({
+            //         ...app,
+            //         selected: false,
+            //     }))
+            //
+            //     this.updateGrid()
+            //
+            //     selectedApps = []
+            // }
 
-            const appRow = this.desktopGridLayout.filter(row =>
-                row.filter(col => col ? col.id === app.id : false).length > 0
-            )[0]
-            const rowIndex = this.desktopGridLayout.indexOf(appRow)
+            if (selectedApps.length > 1) {
+                console.warn(Math.max(...selectedApps.map(app => app.row)), Math.min(...selectedApps.map(app => app.row)), Math.max(...selectedApps.map(app => app.col)), Math.min(...selectedApps.map(app => app.col)))
+                selectedApps.map(app => ({
+                    ...app,
+                    row: Math.max(0, Math.min(this.desktopGridLayout.length - 1, app.row)),
+                    col: Math.max(0, Math.min(this.desktopGridLayout[0].length - 1, app.col)),
+                })).sort((a,b) => {
+                    if (a.col === b.col) {
+                        return a.row - b.row
+                    }
+                    return a.col - b.col
+                }).forEach(app => {
+                    const appRow = this.desktopGridLayout.filter(row =>
+                        row.filter(col => col ? col.id === app.id : false).length > 0
+                    )[0]
+                    const rowIndex = this.desktopGridLayout.indexOf(appRow)
 
-            const appCol = appRow.filter(col => col ? col.id === app.id : false)[0]
+                    const appCol = appRow.filter(col => col ? col.id === app.id : false)[0]
 
-            const colIndex = appRow.indexOf(appCol)
+                    const colIndex = appRow.indexOf(appCol)
 
-            this.desktopGridLayout[rowIndex][colIndex] = null
+                    this.desktopGridLayout[rowIndex][colIndex] = null
 
-            if (this.desktopGridLayout[app.row][app.col] !== null) {
-                this.moveAppDown(app.row, app.col);
+                    if (this.desktopGridLayout[app.row][app.col] !== null) {
+                        this.moveAppDown(app.row, app.col);
+                    }
+                    this.desktopGridLayout[app.row][app.col] = {
+                        id: app.id,
+                        title: app.title,
+                        icon: app.icon,
+                        selected: app.selected,
+                    }
+
+                    console.log(app, this.apps.indexOf(app))
+                    this.apps[this.apps.indexOf(this.apps.find(searchedApp=> searchedApp.id === app.id))] = {
+                        ...this.apps.find(searchedApp=> searchedApp.id === app.id)
+                    }
+
+                    const selectedAppWrapper = app.element.querySelector(".app-wrapper")
+                    selectedAppWrapper.style.position = "static";
+                    selectedAppWrapper.style.top = "auto"
+                    selectedAppWrapper.style.left = "auto"
+                    selectedAppWrapper.style.zIndex = "auto"
+
+                })
+
+                this.grabActive = null
+            } else {
+
+                const appRow = this.desktopGridLayout.filter(row =>
+                    row.filter(col => col ? col.id === grabbedApp.id : false).length > 0
+                )[0]
+                const rowIndex = this.desktopGridLayout.indexOf(appRow)
+
+                const appCol = appRow.filter(col => col ? col.id === grabbedApp.id : false)[0]
+
+                const colIndex = appRow.indexOf(appCol)
+
+                this.desktopGridLayout[rowIndex][colIndex] = null
+
+                if (this.desktopGridLayout[grabbedApp.row][grabbedApp.col] !== null) {
+                    this.moveAppDown(grabbedApp.row, grabbedApp.col);
+                }
+
+                this.desktopGridLayout[grabbedApp.row][grabbedApp.col] = appCol
+
+                const appWrapper = grabbedApp.element.querySelector(".app-wrapper")
+
+                appWrapper.style.position = "static";
+                appWrapper.style.top = "auto"
+                appWrapper.style.left = "auto"
+                this.grabActive = null
+
+                // this.apps.filter(app => app.selected && app.id !== this.grabActive).forEach(selectedApp => {
+                //     const yOffset = selectedApp.element.getBoundingClientRect().y - app.element.getBoundingClientRect().y
+                //     const xOffset = selectedApp.element.getBoundingClientRect().x - app.element.getBoundingClientRect().x
+                //
+                //     const selectedAppWrapper = selectedApp.element.querySelector(".app-wrapper")
+                //     selectedAppWrapper.style.position = "static";
+                //     selectedAppWrapper.style.top = "auto"
+                //     selectedAppWrapper.style.left = "auto"
+                //     selectedAppWrapper.style.zIndex = "auto"
+                // })
+
+                // this.updateGrid()
             }
-
-            console.log(`Main app finished on (${app.row}, ${app.col}) ${this.desktopGridLayout[app.row][app.col]}`)
-            this.desktopGridLayout[app.row][app.col] = appCol
-
-            const appWrapper = app.element.querySelector(".app-wrapper")
-
-            appWrapper.style.position = "static";
-            appWrapper.style.top = "auto"
-            appWrapper.style.left = "auto"
-            this.grabActive = null
-
-            this.apps.filter(app => app.selected && app.id !== this.grabActive).forEach(selectedApp => {
-                const yOffset = selectedApp.element.getBoundingClientRect().y - app.element.getBoundingClientRect().y
-                const xOffset = selectedApp.element.getBoundingClientRect().x - app.element.getBoundingClientRect().x
-
-                const selectedAppWrapper = selectedApp.element.querySelector(".app-wrapper")
-                selectedAppWrapper.style.position = "static";
-                selectedAppWrapper.style.top = "auto"
-                selectedAppWrapper.style.left = "auto"
-                selectedAppWrapper.style.zIndex = "auto"
-            })
-
-            this.updateGrid()
         },
         handleGrab(mouseX, mouseY) {
             const app = this.apps.filter(app => app.id === this.grabActive)[0]
@@ -291,17 +357,25 @@ export default {
             appWrapper.style.zIndex = 500
 
             // also move selected objects
-            this.apps.filter(app => app.selected && app.id !== this.grabActive).forEach(selectedApp => {
-                const yOffset = selectedApp.element.getBoundingClientRect().y - app.element.getBoundingClientRect().y
-                const xOffset = selectedApp.element.getBoundingClientRect().x - app.element.getBoundingClientRect().x
+            if (this.apps.find(app => app.id === this.grabActive).selected) {
+                this.apps.filter(app => app.selected && app.id !== this.grabActive).forEach(selectedApp => {
+                    const yOffset = selectedApp.element.getBoundingClientRect().y - app.element.getBoundingClientRect().y
+                    const xOffset = selectedApp.element.getBoundingClientRect().x - app.element.getBoundingClientRect().x
 
-                const selectedAppWrapper = selectedApp.element.querySelector(".app-wrapper")
-                selectedAppWrapper.style.position = "absolute";
-                selectedAppWrapper.style.top = mouseY + this.grabOffset.y + yOffset + "px"
-                selectedAppWrapper.style.left = mouseX + this.grabOffset.x + xOffset + "px"
-                selectedAppWrapper.style.zIndex = 500
-            })
+                    const selectedAppWrapper = selectedApp.element.querySelector(".app-wrapper")
+                    selectedAppWrapper.style.position = "absolute";
+                    selectedAppWrapper.style.top = mouseY + this.grabOffset.y + yOffset + "px"
+                    selectedAppWrapper.style.left = mouseX + this.grabOffset.x + xOffset + "px"
+                    selectedAppWrapper.style.zIndex = 500
+                })
+            } else {
+                this.apps = this.apps.map(app => ({
+                    ...app,
+                    selected: false,
+                }))
 
+                this.desktopGridLayout = this.desktopGridLayout.map(row => row.map(col => col ? {...col, selected: false} : null))
+            }
             const xDiff = mouseX - this.mouseStartingPosition.x
             const yDiff = mouseY - this.mouseStartingPosition.y
 
@@ -359,15 +433,11 @@ export default {
                 }
             }
 
-            // console.log("Moving", grid[rowIndex][colIndex].title, "from", rowIndex, colIndex, "occupied slot to", newRowIndex, newColIndex)
             if (grid[newRowIndex][newColIndex] !== null) {
-                console.log("entering reccurention")
                 this.moveAppDown(newRowIndex, newColIndex)
             }
 
             const app = this.apps.filter(app => app ? app.id === grid[rowIndex][colIndex].id : false)[0]
-
-            console.log(`Moved app finished on (${newRowIndex}, ${newColIndex})`, grid[newRowIndex][newColIndex], grid[newRowIndex][newColIndex] !== null)
 
             grid[newRowIndex][newColIndex] = grid[rowIndex][colIndex]
             grid[rowIndex][colIndex] = null
@@ -411,14 +481,9 @@ export default {
                     col = 0
                 }
 
-                // console.log("Moving app: ", app.title, " from: ", app.row, app.col, " to: ", row, col)
                 if (newGrid[row][col] !== null) {
-                    // console.log("Slot is occupied moving occupied app down")
                     this.moveAppDown(row, col, newGrid)
                 }
-
-                console.log(`Selected app finished on (${row}, ${col}) ${newGrid[row][col]}`)
-
 
                 newGrid[row][col] = {
                     title: app.title,
@@ -728,13 +793,44 @@ export default {
             }
         },
         showPopup(event) {
+            console.log(event.target, event.target.classList.contains('defaultAction'))
+            if (!event.target.classList.contains('defaultAction')) {
+                event.preventDefault()
+            }
             this.contextMenuActive = true
             this.mouseStartingPosition = {
                 x: event.clientX,
-                y: event.clientY
+                y: event.clientY,
             }
-            this.contextMenuPosition.left = event.clientX
-            this.contextMenuPosition.top = event.clientY
+            this.contextMenuSize.left = 0
+            this.contextMenuSize.top = 0
+            this.contextMenuSize.opacity = 0
+            const menuInterval = setInterval(() => {
+                const contextMenu = document.querySelector('.context-menu')
+                if (contextMenu) {
+                    const menuSize = contextMenu.getBoundingClientRect()
+                    if (event.clientX + menuSize.width * 1.5 > this.viewportSize.width) {
+                        this.contextMenuSize.left = event.clientX - menuSize.width
+                        this.contextMenuOverflowX = true
+                    } else {
+                        this.contextMenuSize.left = event.clientX
+                        this.contextMenuOverflowX = false
+                    }
+
+                    if (event.clientY + menuSize.height > this.viewportSize.height) {
+                        this.contextMenuSize.top = event.clientY - menuSize.height
+                        this.contextMenuOverflowY = true
+                    } else  {
+                        this.contextMenuSize.top = event.clientY
+                        this.contextMenuOverflowY = false
+                    }
+                    console.log(this.contextMenuComputedStyle)
+
+                    this.contextMenuSize.opacity = 1
+                    clearInterval(menuInterval)
+                }
+            }, 50)
+
         },
         addApp(title, icon) {
             let row, col;
@@ -761,13 +857,28 @@ export default {
             }
             this.apps.push(appData)
             this.updateGrid()
+        },
+        triggerBrowserContextMenu(event) {
+            console.log(event)
+            // Create a synthetic click MouseEvent
+            let evt = new PointerEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 2
+            });
+
+            event.target.dispatchEvent(evt);
+
+
+            console.log(evt)
         }
     }
 }
 </script>
 
 <template>
-<main class="desktop-wrapper" @mouseup="cancelSelect" @mousedown="registerMouseSelect" @contextmenu.prevent="showPopup">
+<main class="desktop-wrapper" @mouseup="cancelSelect" @mousedown="registerMouseSelect" @contextmenu="showPopup">
     <div class="desktop-row" v-for="(row, rowIndex) in desktopGridLayout" :key="rowIndex">
         <div class="desktop-slot" v-for="(slot, slotIndex) in row" :key="slotIndex" ref="appSlots">
             <div class="app-wrapper"  v-if="slot" @mousedown="registerGrab($event, slot)" @touchstart="registerGrab($event, slot)" @click="selectApp($event, slot)" :class="{
@@ -787,7 +898,10 @@ export default {
         </div>
     </div>
     <div class="select_block" v-if="selectActive" :style="selectComputedStyle"></div>
-    <ul class="context-menu" v-if="contextMenuActive" :style="contextMenuComputedStyle">
+    <ul class="context-menu" v-if="contextMenuActive" :style="contextMenuComputedStyle" :class="{
+        'overflow-y': contextMenuOverflowY,
+        'overflow-x': contextMenuOverflowX
+    }">
         <li>
             <p>Ułóż ikony wedłóg</p>  <span class="arrow_icon">▶</span>
             <ul class="dropdown">
@@ -830,6 +944,7 @@ export default {
         </li>
         <li class="separator"></li>
         <li><p>Właściwości</p></li>
+        <li @click="triggerBrowserContextMenu" class="defaultAction"><p class="defaultAction">Menu przeglądarki</p></li>
     </ul>
 </main>
 </template>
@@ -987,6 +1102,16 @@ li:hover>p, li:hover>span {
     text-wrap: nowrap;
     padding: 0.2rem;
 }
+.overflow-x .dropdown {
+    left: auto;
+    right: 100%;
+}
+
+.overflow-y .dropdown {
+    top: auto;
+    bottom: 0;
+}
+
 li:hover>.dropdown {
     display: flex;
 }

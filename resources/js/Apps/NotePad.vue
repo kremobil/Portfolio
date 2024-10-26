@@ -7,7 +7,9 @@ export default {
                 {
                     label: "Plik",
                     items: [
-                        {label: "Nowy", action: null},
+                        {label: "Nowy", action: () => {
+                            this.$emit("newFile");
+                        }},
                         {label: "Otwórz...", action: null},
                         {label: "Zapisz", action: null},
                         {label: "Zapisz jako...", action: null},
@@ -15,7 +17,10 @@ export default {
                         {label: "Układ strony", action: null},
                         {label: "Drukuj...", action: null},
                         {separator: true},
-                        {label: "Zamknij", action: null}
+                        {label: "Zamknij", action: () => {
+                            console.log("closeWindow");
+                            this.$emit("closeWindow");
+                        }}
                     ],
                     active: false,
                 },
@@ -23,12 +28,55 @@ export default {
                     label: "Edycja",
                     active: false,
                     items: [
-                        {label: "Cofnij...", action: null},
+                        {label: "Cofnij...", action: () => {
+                            this.navOptions.forEach(option => option.active = false);
+                            document.querySelector("textarea").focus()
+                            const selection = window.getSelection()
+                            if (window.isSecureContext && navigator.clipboard) {
+                                navigator.clipboard.writeText(selection.toString());
+                            } else {
+                                document.execCommand('undo')
+                            }
+                        }},
                         {separator: true},
-                        {label: "Wytnij", action: null},
-                        {label: "Kopiuj", action: null},
-                        {label: "Wklej", action: null},
-                        {label: "Usuń", action: null},
+                        {label: "Wytnij", action: () => {
+                            this.navOptions.forEach(option => option.active = false);
+                            document.querySelector("textarea").focus()
+                            const selection = window.getSelection()
+                            if (window.isSecureContext && navigator.clipboard) {
+                                navigator.clipboard.writeText(selection.toString());
+                            } else {
+                                document.execCommand('copy')
+                            }
+
+                            selection.deleteFromDocument()
+                        }},
+                        {label: "Kopiuj", action: () => {
+                            this.navOptions.forEach(option => option.active = false);
+                            document.querySelector("textarea").focus()
+                            const selection = window.getSelection()
+                            if (window.isSecureContext && navigator.clipboard) {
+                                navigator.clipboard.writeText(selection.toString());
+                            } else {
+                                document.execCommand('copy')
+                            }
+                        }},
+                        {label: "Wklej", action: () => {
+                            this.navOptions.forEach(option => option.active = false);
+                            document.querySelector("textarea").focus()
+                            if (window.isSecureContext && navigator.clipboard) {
+                                console.log(navigator.clipboard.readText());
+                            } else {
+                                document.execCommand('paste')
+                            }
+                        }},
+                        {label: "Usuń", action: () => {
+                            this.navOptions.forEach(option => option.active = false);
+                            document.querySelector("textarea").focus()
+                            const selection = window.getSelection()
+
+                            selection.deleteFromDocument()
+                        }},
                         {separator: true},
                         {label: "Znajdź...", action: null},
                         {label: "Znajdź następny", action: null},
@@ -42,7 +90,7 @@ export default {
                     label: "Format",
                     active: false,
                     items: [
-                        {label: "Zwijaj słowa", action: null},
+                        {label: "Zwijaj słowa", action: () => {this.wordWrap =!this.wordWrap;}},
                         {label: "Czcionka", action: null}
                     ]
                 },
@@ -61,7 +109,9 @@ export default {
                         {label: "Informacje o notatnik", action: null},
                     ]
                 }
-            ]
+            ],
+            content: "",
+            wordWrap: false,
         }
     },
     methods: {
@@ -74,7 +124,7 @@ export default {
     },
     mounted() {
         document.addEventListener('click', (event) => {
-            if (document.querySelector('.actions-bar') && ![...document.querySelector('.actions-bar').querySelectorAll("*")].includes(event.target)) {
+            if (this.$refs.actionBar && ![...this.$refs.actionBar.querySelectorAll("*")].includes(event.target)) {
                 this.navOptions.forEach(option => {
                     option.active = false;
                 });
@@ -87,30 +137,23 @@ export default {
 
 <template>
     <section class="notepad_wrapper">
-        <nav class="actions-bar">
+        <nav class="actions-bar" ref="actionBar">
             <ul>
                 <li v-for="(navOption, index) in navOptions" :key="index" :class="{
                     active: navOption.active,
                 }">
-                    <p @click="setActive(navOption)">{{ navOption.label }}</p>
+                    <p @click.prevent="setActive(navOption)">{{ navOption.label }}</p>
                     <ul v-if="navOption.items && navOption.active" class="dropdown">
                         <li v-for="(nestedNavOption, index) in navOption.items" :key="index" :class="{
                             separator: nestedNavOption.separator,
-                        }"><p v-if="!nestedNavOption.separator">{{ nestedNavOption.label }}</p></li>
+                        }"><p v-if="!nestedNavOption.separator" @click="nestedNavOption.action">{{ nestedNavOption.label }}</p></li>
                     </ul>
                 </li>
             </ul>
         </nav>
-        <div class="editor">
-            <textarea></textarea>
-            <div class="scroll-horizontal">
-                <button class="arrow-up"><img src="icons/Scroll UP.png" alt=""></button>
-                <div class="thumb-track"></div>
-                <div class="arrow-down"></div>
-            </div>
-            <div class="scroll-vertical"></div>
-            <div class="resize-grip"></div>
-        </div>
+        <textarea v-model="content" :style="{
+            whiteSpace: wordWrap? 'wrap' : 'nowrap',
+        }"></textarea>
     </section>
 </template>
 
@@ -154,16 +197,13 @@ export default {
         flex-direction: column;
         width: fit-content;
         padding: 0.1rem;
+        z-index: 100;
     }
     .dropdown p {
         padding: 0 1rem;
         text-wrap: nowrap;
     }
     textarea {
-        position: absolute;
-        top: 0;
-        left: 0;
-        background-color: red;
         width: 100%;
         height: 100%;
         padding: 0.5rem;
@@ -178,9 +218,6 @@ export default {
         overflow: hidden;
         position: relative;
         border: 1px solid #7f9db9;
-        display: grid;
-        grid-template-columns: auto 20px;
-        grid-template-rows: auto 20px;
     }
     .scroll-vertical {
         width: 100%;
@@ -216,10 +253,54 @@ export default {
     textarea:focus {
         outline: none;
     }
-    .scroll-horizontal .arrow-up {
-        box-shadow: 2px 2px 4px rgba(128, 128, 128, 0.5);
+    .scroll-horizontal {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
     .scroll-horizontal .arrow-up {
         box-shadow: 2px 2px 4px rgba(128, 128, 128, 0.5);
+    }
+    .scroll-horizontal .arrow-down {
+        box-shadow: -2px -2px 4px rgba(128, 128, 128, 0.5);
+        transform: rotateZ(180deg);
+    }
+    .scroll-horizontal .thumb-track {
+        width: 100%;
+        height: 100%;
+        background-color: cyan;
+    }
+    .scroll-horizontal .thumb {
+        width:100%;
+        height: 30%;
+        background-color: purple;
+    }
+    .scroll-vertical {
+        width: 100%;
+        display: flex;
+        height: 100%;
+    }
+    .scroll-vertical .arrow-left {
+        box-shadow: 2px 2px 4px rgba(128, 128, 128, 0.5);
+        height: 100%;
+        transform: rotateZ(270deg);
+    }
+    .scroll-vertical img {
+        height: 100%;
+    }
+    .scroll-vertical .arrow-right {
+        box-shadow: -2px -2px 4px rgba(128, 128, 128, 0.5);
+        height: 100%;
+        transform: rotateZ(90deg);
+    }
+    .scroll-vertical .thumb-track {
+        width: 100%;
+        height: 100%;
+        background-color: cyan;
+    }
+    .scroll-vertical .thumb {
+        width: 30%;
+        height: 100%;
+        background-color: purple;
     }
 </style>

@@ -69,6 +69,19 @@ export default {
             } else if (window.selected) {
                 this.minimizeWindow(windowId);
             }
+        },
+        openNewWindow(appName, icon) {
+            const newWindow = {
+                id: Math.max(...this.activeWindows.map(window => window.id)) + 1,
+                title: appName,
+                icon: icon,
+                maximized: false,
+                minimized: false,
+                selected: true
+            }
+            this.activeWindows.push(newWindow);
+
+            this.changeSelectedWindow(newWindow.id);
         }
     }
 }
@@ -97,7 +110,7 @@ export default {
             @selected-window="changeSelectedWindow(window.id)"
             @minimize-window="minimizeWindow(window.id)"
         >
-            <Notepad></Notepad>
+            <Notepad @close-window="closeWindow(window.id)" @new-file="openNewWindow('Notatnik', 'NOTEPAD.EXE_14_2-4.png')"></Notepad>
         </AppWindow>
     </section>
 </template>
